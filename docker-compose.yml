@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: seovate
+      POSTGRES_PASSWORD: seovate_dev_password
+      POSTGRES_DB: seovate
+    ports:
+      - "5435:5432"
+    volumes:
+      - seovate_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seovate -d seovate"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  seovate_pgdata:

@@ -1,0 +1,22 @@
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/.env
+frontend/.env.local
+frontend/data/
+
+# Backend
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local tooling (Claude Code session state — not project source)
+.claude/

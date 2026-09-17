@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  createdAt    DateTime      @default(now())
+  lastLoginAt  DateTime?
+  googleSub    String?
+  integrations Integration[]
+
+  @@map("users")
+}
+
+// Deliberately has no FK relation to User: a signup OTP is requested (and stored) before
+// any User row exists — the User is only created once the code is verified.
+model OtpCode {
+  id              String   @id @default(cuid())
+  email           String
+  purpose         String
+  codeHash        String
+  expiresAt       DateTime
+  attempts        Int      @default(0)
+  sentAt          DateTime
+  resendCount     Int      @default(1)
+  windowStartedAt DateTime
+
+  @@unique([email, purpose])
+  @@map("otp_codes")
+}
+
+model Integration {
+  id               String    @id @default(cuid())
+  userId           String
+  provider         String
+  status           String    @default("connected")
+  accessTokenEnc   String
+  refreshTokenEnc  String?
+  scope            String?
+  externalLabel    String?
+  tokenExpiresAt   DateTime?
+  // GitHub-only: the repo the user picked to scaffold SEO files into, the site URL to audit
+  // when generating them, and the number of the last PR Seovate opened for that scaffolding.
+  repoFullName     String?
+  siteUrl          String?
+  lastPrNumber     Int?
+  connectedAt      DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@map("integrations")
+}
