@@ -48,20 +48,67 @@ export default function LandingPage() {
       <header className="border-b-2 border-ink">
         <div className="mx-auto flex h-[76px] max-w-[1240px] items-center justify-between px-8">
           <Logo />
-          <nav className="flex items-center gap-6 text-[15px] font-medium">
-            <a href="#how-it-works" className="hover:opacity-70">
-              How it works
-            </a>
+          <nav className="flex items-center gap-8 text-[15px] font-medium text-ink">
+            <Link href="/pipeline" className="hover:opacity-70">
+              Platform
+            </Link>
+
+            <div className="group relative">
+              <button type="button" className="flex items-center gap-1 text-accent">
+                Solutions
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" className="rotate-180">
+                  <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+                </svg>
+              </button>
+              <div className="invisible absolute left-1/2 top-full z-10 w-140 -translate-x-1/2 pt-3 opacity-0 transition-opacity group-hover:visible group-hover:opacity-100">
+                <div className="grid grid-cols-3 gap-6 rounded-xl border border-[#eeece2] bg-white p-6 shadow-[0_12px_32px_rgba(0,0,0,0.12)]">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-muted">By team</p>
+                    <div className="mt-3 flex flex-col gap-1">
+                      <Link href="/activity" className="rounded px-2 py-1.5 text-sm hover:bg-accent-soft">
+                        For Content Marketers
+                      </Link>
+                      <Link href="/guardrails" className="rounded px-2 py-1.5 text-sm text-accent hover:bg-accent-soft">
+                        For SEO Teams
+                      </Link>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-muted">By segment</p>
+                    <div className="mt-3 flex flex-col gap-1">
+                      <Link href="/gbp-activity" className="rounded px-2 py-1.5 text-sm hover:bg-accent-soft">
+                        For Agencies
+                      </Link>
+                      <Link href="/opportunities" className="rounded px-2 py-1.5 text-sm hover:bg-accent-soft">
+                        For Enterprise
+                      </Link>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-muted">Proof</p>
+                    <div className="mt-3 flex flex-col gap-1">
+                      <Link href="/activity" className="rounded px-2 py-1.5 text-sm hover:bg-accent-soft">
+                        Customer Stories
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Link href="/guardrails" className="hover:opacity-70">
+              Resources
+            </Link>
             <Link href="/pricing" className="hover:opacity-70">
               Pricing
             </Link>
-            <Link href="/activity" className="hover:opacity-70">
-              Sample activity log
-            </Link>
-            <LinkButton href="/login" variant="ghost">
+
+            <Link href="/login" className="hover:opacity-70">
               Log in
+            </Link>
+            <LinkButton href="/signup" className="rounded-full!">
+              Start free trial →
             </LinkButton>
-            <LinkButton href="/signup">Connect your site</LinkButton>
           </nav>
         </div>
       </header>
