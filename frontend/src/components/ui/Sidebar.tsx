@@ -55,8 +55,8 @@ export default function Sidebar() {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 -translate-x-full flex-col border-r-2 border-ink bg-white transition-transform duration-200 lg:static lg:z-auto lg:w-60 lg:translate-x-0 ${
-          open ? "translate-x-0" : ""
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col border-r-2 border-ink bg-white transition-transform duration-200 lg:static lg:z-auto lg:w-60 lg:translate-x-0 ${
+          open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="flex items-center justify-between border-b-2 border-ink px-6 py-6">
