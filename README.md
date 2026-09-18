@@ -42,6 +42,8 @@ npm run dev
 ```
 
 Frontend runs at http://localhost:3000, backend API at http://localhost:8000.
+Copy `frontend/.env.example` to `frontend/.env.local` and fill in the values you need — it
+documents every variable, including which ones are optional in development.
 Set `NEXT_PUBLIC_API_BASE_URL` in `frontend/.env.local` to point at the backend (defaults to `http://localhost:8000`).
 
 To test real Google/GitHub sign-in, fill in `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and
