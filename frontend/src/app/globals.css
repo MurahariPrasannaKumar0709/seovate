@@ -32,6 +32,7 @@
 body {
   background: var(--paper);
   color: var(--ink);
+  overflow-x: hidden;
 }
 
 .sketch-box {

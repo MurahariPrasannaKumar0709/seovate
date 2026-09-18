@@ -22,13 +22,13 @@ export default function PricingPage() {
   return (
     <main className="flex-1 bg-paper">
       <header className="border-b-2 border-ink">
-        <div className="mx-auto flex h-[76px] max-w-[1240px] items-center justify-between px-8">
+        <div className="mx-auto flex h-[76px] max-w-[1240px] items-center justify-between px-4 sm:px-8">
           <Logo />
           <LinkButton href="/signup">Connect your site</LinkButton>
         </div>
       </header>
 
-      <div className="mx-auto max-w-[1240px] px-8 py-16">
+      <div className="mx-auto max-w-[1240px] px-4 sm:px-8 py-16">
         <div className="text-center">
           <h1 className="text-[40px] font-bold">One plan. Everything included.</h1>
           <p className="mt-3 text-base text-muted">

@@ -57,7 +57,7 @@ export default function GuardrailCheckPage() {
   const capBars = Array.from({ length: data.weekly_cap_total }, (_, i) => i < data.weekly_cap_used);
 
   return (
-    <main className="flex-1 bg-paper px-8 py-12">
+    <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
       <div className="mx-auto max-w-[760px]">
         <p className="text-xs font-bold uppercase tracking-wide text-accent">
           Stage 3 → 4 · Guardrail layer

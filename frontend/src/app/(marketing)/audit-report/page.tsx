@@ -14,13 +14,13 @@ export default function AuditReportPage() {
   return (
     <main className="flex-1 bg-paper">
       <header className="border-b-2 border-ink bg-white">
-        <div className="mx-auto flex h-[76px] max-w-[900px] items-center justify-between px-8">
+        <div className="mx-auto flex h-[76px] max-w-[900px] items-center justify-between px-4 sm:px-8">
           <Logo />
           <Tag variant="success">Free SEO audit</Tag>
         </div>
       </header>
 
-      <div className="mx-auto max-w-[900px] px-8 py-14">
+      <div className="mx-auto max-w-[900px] px-4 sm:px-8 py-14">
         <p className="text-xs font-bold uppercase tracking-wide text-accent">Site audit for</p>
         <h1 className="mt-1 text-[30px] font-bold">frisco-plumbing-co.com</h1>
         <p className="mt-2 text-sm text-muted">

@@ -33,7 +33,7 @@ export default function GBPActivityPage() {
   return (
     <main className="flex-1 bg-paper">
       <header className="border-b-2 border-ink bg-white">
-        <div className="mx-auto max-w-[860px] px-8 py-6">
+        <div className="mx-auto max-w-[860px] px-4 sm:px-8 py-6">
           <p className="text-xs font-bold uppercase tracking-wide text-muted">
             v1.x · Local presence
           </p>
@@ -41,7 +41,7 @@ export default function GBPActivityPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-[860px] px-8 py-10">
+      <div className="mx-auto max-w-[860px] px-4 sm:px-8 py-10">
         <section>
           <h2 className="text-lg font-bold">What&apos;s New posts</h2>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">

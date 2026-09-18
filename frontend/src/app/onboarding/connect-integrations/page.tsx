@@ -59,7 +59,7 @@ function ConnectIntegrationsPageInner() {
   }, []);
 
   return (
-    <main className="flex-1 bg-paper px-8 py-12">
+    <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
       <div className="mx-auto max-w-[760px]">
         <Logo />
         <p className="mt-8 text-xs font-bold uppercase tracking-wide text-accent">Step 2 of 4</p>
@@ -121,7 +121,7 @@ function ConnectIntegrationsPageInner() {
           </InfoCallout>
         </div>
 
-        <div className="mt-8 flex items-center justify-between">
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
           <Button variant="ghost" type="button" onClick={() => router.push("/onboarding")}>
             Back
           </Button>

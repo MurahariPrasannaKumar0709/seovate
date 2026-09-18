@@ -145,13 +145,13 @@ function IntegrationsSettingsPageInner() {
   return (
     <main className="flex-1 bg-paper">
       <header className="border-b-2 border-ink bg-white">
-        <div className="mx-auto max-w-[880px] px-8 py-6">
+        <div className="mx-auto max-w-[880px] px-4 sm:px-8 py-6">
           <p className="text-xs font-bold uppercase tracking-wide text-muted">Settings</p>
           <h1 className="mt-1 text-2xl font-bold">Integrations</h1>
         </div>
       </header>
 
-      <div className="mx-auto max-w-[880px] px-8 py-10">
+      <div className="mx-auto max-w-[880px] px-4 sm:px-8 py-10">
         <p className="text-sm text-muted">
           Manage every account Seovate uses to see and act on your site.
         </p>
@@ -191,7 +191,7 @@ function IntegrationsSettingsPageInner() {
                     </div>
                   </div>
                   {connected ? (
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex flex-wrap shrink-0 items-center gap-2">
                       {integration.name === "Google Search Console" && (
                         <label className="flex items-center gap-2 text-xs text-muted">
                           <input

@@ -32,7 +32,7 @@ export default function SetupCompletePage() {
         </div>
       </SketchBox>
 
-      <div className="mt-8 flex items-center gap-4">
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
         <LinkButton href="/activity">View activity log</LinkButton>
         <LinkButton href="/settings/integrations" variant="ghost">
           Go to settings

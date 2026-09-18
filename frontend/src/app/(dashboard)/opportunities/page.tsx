@@ -34,13 +34,13 @@ export default function OpportunityQueuePage() {
   return (
     <main className="flex-1 bg-paper">
       <header className="border-b-2 border-ink bg-white">
-        <div className="mx-auto max-w-[900px] px-8 py-6">
+        <div className="mx-auto max-w-[900px] px-4 sm:px-8 py-6">
           <p className="text-xs font-bold uppercase tracking-wide text-muted">Stage 2 · Research</p>
           <h1 className="mt-1 text-2xl font-bold">Opportunity queue</h1>
         </div>
       </header>
 
-      <div className="mx-auto max-w-[900px] px-8 py-10">
+      <div className="mx-auto max-w-[900px] px-4 sm:px-8 py-10">
         <p className="max-w-2xl text-muted">
           Keyword and content-gap research runs continuously in the background. Nothing here is
           published yet — this is the backlog, prioritized, waiting for Stage 3 to generate a
