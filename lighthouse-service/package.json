@@ -1,0 +1,18 @@
+{
+  "name": "seovate-lighthouse-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone Node service that runs real Lighthouse audits (headless Chromium via Playwright) on behalf of the Seovate frontend.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "postinstall": "playwright install --with-deps chromium"
+  },
+  "dependencies": {
+    "chrome-launcher": "^1.1.2",
+    "express": "^4.21.2",
+    "lighthouse": "^12.2.1",
+    "playwright": "^1.48.2"
+  }
+}

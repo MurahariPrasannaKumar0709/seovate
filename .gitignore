@@ -11,6 +11,10 @@ backend/__pycache__/
 backend/**/__pycache__/
 backend/.env
 
+# Lighthouse service
+lighthouse-service/node_modules/
+lighthouse-service/.env
+
 # OS
 .DS_Store
 Thumbs.db

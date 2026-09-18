@@ -8,6 +8,7 @@ import Logo from "@/components/ui/Logo";
 const NAV_ITEMS = [
   { href: "/pipeline", label: "Weekly site check" },
   { href: "/search-console", label: "Search Console" },
+  { href: "/lighthouse", label: "Lighthouse audit" },
   { href: "/opportunities", label: "Opportunities" },
   { href: "/guardrails", label: "Guardrails" },
   { href: "/gbp-activity", label: "Business Profile" },
