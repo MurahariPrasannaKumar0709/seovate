@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Tag from "@/components/ui/Tag";
 import { Button } from "@/components/ui/Button";
@@ -53,6 +53,14 @@ function oauthErrorMessage(code: string): string {
 }
 
 export default function IntegrationsSettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <IntegrationsSettingsPageInner />
+    </Suspense>
+  );
+}
+
+function IntegrationsSettingsPageInner() {
   const searchParams = useSearchParams();
   const [integrations, setIntegrations] = useState<Integration[]>(INTEGRATIONS_SETTINGS);
   const [oauthStatus, setOauthStatus] = useState<Record<string, OauthStatus>>({});

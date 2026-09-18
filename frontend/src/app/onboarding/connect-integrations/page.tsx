@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Logo from "@/components/ui/Logo";
 import Tag from "@/components/ui/Tag";
@@ -33,6 +33,14 @@ function oauthErrorMessage(code: string): string {
 }
 
 export default function ConnectIntegrationsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ConnectIntegrationsPageInner />
+    </Suspense>
+  );
+}
+
+function ConnectIntegrationsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [oauthStatus, setOauthStatus] = useState<Record<string, OauthStatus>>({});
