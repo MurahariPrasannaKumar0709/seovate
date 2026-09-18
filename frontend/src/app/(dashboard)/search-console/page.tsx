@@ -163,7 +163,7 @@ export default function SearchConsolePage() {
 
   if (loading && !data) {
     return (
-      <main className="flex-1 bg-paper px-8 py-12">
+      <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
         <p className="text-sm text-muted">Loading Search Console data…</p>
       </main>
     );
@@ -171,7 +171,7 @@ export default function SearchConsolePage() {
 
   if (!data?.connected) {
     return (
-      <main className="flex-1 bg-paper px-8 py-12">
+      <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
         <div className="mx-auto max-w-[640px]">
           <h1 className="text-2xl font-bold">Search Console</h1>
           <div className="mt-6">
@@ -195,7 +195,7 @@ export default function SearchConsolePage() {
 
   if (data.reason === "no_sites") {
     return (
-      <main className="flex-1 bg-paper px-8 py-12">
+      <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
         <div className="mx-auto max-w-[640px]">
           <h1 className="text-2xl font-bold">Search Console</h1>
           <div className="mt-6">
@@ -212,7 +212,7 @@ export default function SearchConsolePage() {
 
   if (data.reason === "api_error") {
     return (
-      <main className="flex-1 bg-paper px-8 py-12">
+      <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
         <div className="mx-auto max-w-[640px]">
           <h1 className="text-2xl font-bold">Search Console</h1>
           <div className="mt-6">
@@ -238,7 +238,7 @@ export default function SearchConsolePage() {
   return (
     <main className="flex-1 bg-paper">
       <header className="border-b-2 border-ink bg-white">
-        <div className="mx-auto flex max-w-[960px] flex-wrap items-center justify-between gap-3 px-8 py-6">
+        <div className="mx-auto flex max-w-[960px] flex-wrap items-center justify-between gap-3 px-4 sm:px-8 py-6">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-muted">Google Search Console</p>
             <h1 className="mt-1 text-2xl font-bold">Search performance</h1>
@@ -259,7 +259,7 @@ export default function SearchConsolePage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-[960px] px-8 py-10">
+      <div className="mx-auto max-w-[960px] px-4 sm:px-8 py-10">
         {data.linkedRepo && (
           <p className="mb-3 text-xs text-muted">
             Connected repo for this domain:{" "}
@@ -307,9 +307,11 @@ export default function SearchConsolePage() {
                 const warningCount = parseInt(sm.warnings ?? "0", 10) || 0;
                 return (
                   <div key={sm.path} className="border-t border-[#eeece2] pt-2 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono">{sm.path}</span>
-                      <span className="text-muted">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="min-w-0 truncate font-mono" title={sm.path}>
+                        {sm.path}
+                      </span>
+                      <span className="shrink-0 text-muted">
                         {sm.indexed}/{sm.submitted} indexed
                       </span>
                     </div>
@@ -361,12 +363,12 @@ export default function SearchConsolePage() {
           )}
         </SketchBox>
 
-        <div className="mt-8 flex gap-2 border-b-2 border-ink">
+        <div className="mt-8 flex gap-2 overflow-x-auto border-b-2 border-ink">
           {TABS.map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-2 text-sm font-bold uppercase tracking-wide ${
+              className={`shrink-0 px-4 py-2 text-sm font-bold uppercase tracking-wide ${
                 tab === t ? "border-b-2 border-ink -mb-0.5 text-ink" : "text-muted"
               }`}
             >

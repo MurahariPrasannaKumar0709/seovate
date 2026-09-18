@@ -47,7 +47,7 @@ export default function GitHubConsentPage() {
 
   if (!preview) {
     return (
-      <main className="flex-1 bg-paper px-8 py-12">
+      <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
         <p className="text-sm text-muted">Auditing your site…</p>
       </main>
     );
@@ -55,7 +55,7 @@ export default function GitHubConsentPage() {
 
   if ("error" in preview) {
     return (
-      <main className="flex-1 bg-paper px-8 py-12">
+      <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
         <div className="mx-auto max-w-[640px]">
           <Link href="/github/repo-scan" className="text-sm font-bold text-muted hover:text-ink">
             ← Back
@@ -71,7 +71,7 @@ export default function GitHubConsentPage() {
 
   if (preview.allPresent) {
     return (
-      <main className="flex-1 bg-paper px-8 py-12">
+      <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
         <div className="mx-auto max-w-[640px]">
           <Link href="/github/repo-scan" className="text-sm font-bold text-muted hover:text-ink">
             ← Back
@@ -89,7 +89,7 @@ export default function GitHubConsentPage() {
   }
 
   return (
-    <main className="flex-1 bg-paper px-8 py-12">
+    <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
       <div className="mx-auto max-w-[760px]">
         <Link href="/github/repo-scan" className="text-sm font-bold text-muted hover:text-ink">
           ← Back
@@ -148,7 +148,7 @@ export default function GitHubConsentPage() {
           </InfoCallout>
         </div>
 
-        <div className="mt-8 flex items-center justify-between">
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
           <Button variant="ghost" type="button" onClick={() => router.push("/github/repo-scan")}>
             Not now
           </Button>

@@ -55,7 +55,7 @@ export default function ActivityLogPage() {
   return (
     <main className="flex-1 bg-paper">
       <header className="border-b-2 border-ink bg-white">
-        <div className="mx-auto flex max-w-[920px] items-center justify-between px-8 py-6">
+        <div className="mx-auto flex max-w-[920px] items-center justify-between px-4 sm:px-8 py-6">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-muted">
               Public activity log
@@ -68,7 +68,7 @@ export default function ActivityLogPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-[920px] px-8 py-10">
+      <div className="mx-auto max-w-[920px] px-4 sm:px-8 py-10">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <StatCard value="11" label="Issues fixed this week" />
           <StatCard value="2" label="New pages published this week" />

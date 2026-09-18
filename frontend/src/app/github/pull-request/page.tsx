@@ -59,7 +59,7 @@ export default function GitHubPullRequestPage() {
 
   if (!data) {
     return (
-      <main className="flex-1 bg-paper px-8 py-12">
+      <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
         <p className="text-sm text-muted">Loading pull request…</p>
       </main>
     );
@@ -67,7 +67,7 @@ export default function GitHubPullRequestPage() {
 
   if (!data.exists) {
     return (
-      <main className="flex-1 bg-paper px-8 py-12">
+      <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
         <div className="mx-auto max-w-[640px]">
           <Link href="/github/repo-scan" className="text-sm font-bold text-muted hover:text-ink">
             ← Back
@@ -86,7 +86,7 @@ export default function GitHubPullRequestPage() {
 
   if ("error" in data) {
     return (
-      <main className="flex-1 bg-paper px-8 py-12">
+      <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
         <div className="mx-auto max-w-[640px]">
           <Link href="/github/repo-scan" className="text-sm font-bold text-muted hover:text-ink">
             ← Back
@@ -103,7 +103,7 @@ export default function GitHubPullRequestPage() {
   const { status } = data;
 
   return (
-    <main className="flex-1 bg-paper px-8 py-12">
+    <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
       <div className="mx-auto max-w-[800px]">
         <Link href="/github/repo-scan" className="text-sm font-bold text-muted hover:text-ink">
           ← Back
@@ -141,12 +141,14 @@ export default function GitHubPullRequestPage() {
           {data.files.map((f, i) => (
             <div
               key={f.path}
-              className={`flex items-center justify-between p-4 ${
+              className={`flex items-center justify-between gap-3 p-4 ${
                 i !== data.files.length - 1 ? "border-b border-[#eeece2]" : ""
               }`}
             >
-              <span className="font-mono text-sm">{f.path}</span>
-              <span className="font-mono text-sm font-bold text-accent">+{f.additions}</span>
+              <span className="min-w-0 truncate font-mono text-sm" title={f.path}>
+                {f.path}
+              </span>
+              <span className="shrink-0 font-mono text-sm font-bold text-accent">+{f.additions}</span>
             </div>
           ))}
         </SketchBox>

@@ -37,31 +37,33 @@ export default function PipelineStatusPage() {
   return (
     <main className="flex-1 bg-paper">
       <header className="border-b-2 border-ink bg-white">
-        <div className="mx-auto max-w-[960px] px-8 py-6">
+        <div className="mx-auto max-w-[960px] px-4 sm:px-8 py-6">
           <p className="text-xs font-bold uppercase tracking-wide text-muted">How Seovate works</p>
           <h1 className="mt-1 text-2xl font-bold">This week&apos;s pipeline</h1>
         </div>
       </header>
 
-      <div className="mx-auto max-w-[960px] px-8 py-10">
+      <div className="mx-auto max-w-[960px] px-4 sm:px-8 py-10">
         <p className="max-w-2xl text-muted">
           A scheduled pipeline, not an open-ended agent — five fixed stages run on a cadence, each
           one auditable on its own. This is what&apos;s running for {CUSTOMER.domain} right now.
         </p>
 
-        <div className="relative mt-10 flex items-start justify-between">
-          <div className="absolute left-0 right-0 top-5 h-[2px] bg-[#d8d6ca]" />
-          {data.stages.map((stage) => (
-            <div key={stage.n} className="relative z-10 flex flex-1 flex-col items-center text-center">
-              <div
-                className={`flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-bold ${STATE_CLASSES[stage.state]}`}
-              >
-                {stage.n}
+        <div className="mt-10 overflow-x-auto">
+          <div className="relative flex min-w-[560px] items-start justify-between">
+            <div className="absolute left-0 right-0 top-5 h-[2px] bg-[#d8d6ca]" />
+            {data.stages.map((stage) => (
+              <div key={stage.n} className="relative z-10 flex flex-1 flex-col items-center text-center px-1">
+                <div
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold ${STATE_CLASSES[stage.state]}`}
+                >
+                  {stage.n}
+                </div>
+                <div className="mt-2 text-sm font-bold">{stage.title}</div>
+                <div className="text-xs text-muted">{stage.cadence}</div>
               </div>
-              <div className="mt-2 text-sm font-bold">{stage.title}</div>
-              <div className="text-xs text-muted">{stage.cadence}</div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         <SketchBox className="mt-12 overflow-x-auto p-0">

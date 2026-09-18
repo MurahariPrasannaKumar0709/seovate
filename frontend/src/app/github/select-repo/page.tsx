@@ -54,7 +54,7 @@ export default function SelectRepoPage() {
   }
 
   return (
-    <main className="flex-1 bg-paper px-8 py-12">
+    <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
       <div className="mx-auto max-w-[560px]">
         <Link href="/settings/integrations" className="text-sm font-bold text-muted hover:text-ink">
           ← Back to Integrations

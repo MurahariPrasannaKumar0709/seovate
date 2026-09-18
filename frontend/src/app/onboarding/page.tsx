@@ -56,7 +56,7 @@ export default function OnboardingStep1Page() {
   }
 
   return (
-    <main className="flex-1 bg-paper px-8 py-12">
+    <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
       <div className="mx-auto flex max-w-[1200px] flex-col gap-12 lg:flex-row">
         <OnboardingStepper activeStep={1} />
 
@@ -149,7 +149,7 @@ export default function OnboardingStep1Page() {
             </InfoCallout>
           </div>
 
-          <div className="mt-8 flex max-w-[560px] items-center justify-between">
+          <div className="mt-8 flex max-w-[560px] flex-wrap items-center justify-between gap-3">
             <Button variant="ghost" type="button" onClick={() => router.push("/signup")}>
               Back
             </Button>

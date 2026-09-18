@@ -29,7 +29,7 @@ export default function GitHubRepoScanPage() {
 
   if (!data) {
     return (
-      <main className="flex-1 bg-paper px-8 py-12">
+      <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
         <p className="text-sm text-muted">Checking your repository…</p>
       </main>
     );
@@ -37,7 +37,7 @@ export default function GitHubRepoScanPage() {
 
   if (!data.selected) {
     return (
-      <main className="flex-1 bg-paper px-8 py-12">
+      <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
         <div className="mx-auto max-w-[640px]">
           <Link href="/settings/integrations" className="text-sm font-bold text-muted hover:text-ink">
             ← Back to Integrations
@@ -59,7 +59,7 @@ export default function GitHubRepoScanPage() {
 
   if ("error" in data) {
     return (
-      <main className="flex-1 bg-paper px-8 py-12">
+      <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
         <div className="mx-auto max-w-[640px]">
           <Link href="/settings/integrations" className="text-sm font-bold text-muted hover:text-ink">
             ← Back to Integrations
@@ -87,7 +87,7 @@ export default function GitHubRepoScanPage() {
   const actionableCount = files.filter((f) => f.status !== "up_to_date").length;
 
   return (
-    <main className="flex-1 bg-paper px-8 py-12">
+    <main className="flex-1 bg-paper px-4 sm:px-8 py-12">
       <div className="mx-auto max-w-[720px]">
         <Link href="/github/select-repo" className="text-sm font-bold text-muted hover:text-ink">
           ← Change repository
