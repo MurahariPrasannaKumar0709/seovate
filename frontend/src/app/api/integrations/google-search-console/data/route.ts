@@ -8,6 +8,8 @@ import {
   querySearchAnalytics,
   type SearchAnalyticsRow,
 } from "@/lib/integrations/searchConsole";
+import { getGitHubSelection } from "@/lib/integrations/githubSelection";
+import { matchGithubSiteToGscProperty } from "@/lib/integrations/siteMatch";
 
 function toDateString(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -46,6 +48,16 @@ export async function GET(req: NextRequest) {
 
   const requestedSite = req.nextUrl.searchParams.get("site");
   const selectedSite = sites.some((s) => s.siteUrl === requestedSite) ? requestedSite! : sites[0].siteUrl;
+
+  // GitHub's connected repo/site and a GSC property are stored on unrelated Integration rows —
+  // this is a best-effort domain match so the currently selected property can show which repo (if
+  // any) Seovate would scaffold sitemap.xml/robots.txt into for this domain.
+  const githubSelection = await getGitHubSelection(user.id);
+  const matchedSite = githubSelection ? matchGithubSiteToGscProperty(githubSelection.siteUrl, sites) : null;
+  const linkedRepo =
+    githubSelection && matchedSite?.siteUrl === selectedSite
+      ? { repoFullName: githubSelection.repoFullName, prNumber: githubSelection.lastPrNumber }
+      : null;
 
   // GSC data typically lags 2-3 days; end the range a few days back so the last days aren't
   // just empty/zero from not having reported yet.
@@ -108,13 +120,21 @@ export async function GET(req: NextRequest) {
     const indexed = (sm.contents ?? []).reduce((sum, c) => sum + (parseInt(c.indexed ?? "0", 10) || 0), 0);
     totalSubmitted += submitted;
     totalIndexed += indexed;
-    return { path: sm.path, submitted, indexed, lastSubmitted: sm.lastSubmitted ?? null };
+    return {
+      path: sm.path,
+      submitted,
+      indexed,
+      lastSubmitted: sm.lastSubmitted ?? null,
+      errors: sm.errors ?? null,
+      warnings: sm.warnings ?? null,
+    };
   });
 
   return NextResponse.json({
     connected: true,
     sites,
     selectedSite,
+    linkedRepo,
     dateRange: { start: startDate, end: endDate },
     totals,
     daily,

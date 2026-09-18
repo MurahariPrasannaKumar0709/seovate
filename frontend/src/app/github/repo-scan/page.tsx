@@ -9,7 +9,8 @@ import { Button, LinkButton } from "@/components/ui/Button";
 import { SketchBox, InfoCallout } from "@/components/ui/SketchBox";
 import { IconCheck, IconX } from "@/components/ui/Icons";
 
-type ScanFile = { path: string; description: string; present: boolean };
+type FileStatus = "missing" | "outdated" | "up_to_date";
+type ScanFile = { path: string; description: string; status: FileStatus };
 type ScanResponse =
   | { selected: false }
   | { selected: true; error: string; status?: number }
@@ -74,8 +75,16 @@ export default function GitHubRepoScanPage() {
     );
   }
 
-  const files = data.files.map((f) => ({ ...f, variant: f.present ? ("success" as const) : ("warn" as const) }));
-  const missingCount = files.filter((f) => !f.present).length;
+  const STATUS_LABEL: Record<FileStatus, string> = {
+    up_to_date: "Up to date",
+    outdated: "Needs update",
+    missing: "Missing",
+  };
+  const files = data.files.map((f) => ({
+    ...f,
+    variant: f.status === "up_to_date" ? ("success" as const) : ("warn" as const),
+  }));
+  const actionableCount = files.filter((f) => f.status !== "up_to_date").length;
 
   return (
     <main className="flex-1 bg-paper px-8 py-12">
@@ -95,7 +104,7 @@ export default function GitHubRepoScanPage() {
 
         <SketchBox className="mt-8 divide-y-0 p-0">
           {files.map((file, i) => {
-            const Icon = file.present ? IconCheck : IconX;
+            const Icon = file.status === "up_to_date" ? IconCheck : IconX;
             return (
               <div
                 key={file.path}
@@ -110,7 +119,7 @@ export default function GitHubRepoScanPage() {
                     <p className="mt-1 text-sm text-muted">{file.description}</p>
                   </div>
                 </div>
-                <Tag variant={file.variant}>{file.present ? "Up to date" : "Missing"}</Tag>
+                <Tag variant={file.variant}>{STATUS_LABEL[file.status]}</Tag>
               </div>
             );
           })}
@@ -118,9 +127,11 @@ export default function GitHubRepoScanPage() {
 
         <div className="mt-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted">
-            {missingCount === 0 ? "All expected files are present." : `${missingCount} file(s) missing`}
+            {actionableCount === 0
+              ? "Both files are present and match your live site."
+              : `${actionableCount} file(s) missing or out of date`}
           </p>
-          {missingCount > 0 && (
+          {actionableCount > 0 && (
             <Button type="button" onClick={() => router.push("/github/consent")}>
               Review & approve changes →
             </Button>

@@ -57,6 +57,8 @@ export default function IntegrationsSettingsPage() {
   const [integrations, setIntegrations] = useState<Integration[]>(INTEGRATIONS_SETTINGS);
   const [oauthStatus, setOauthStatus] = useState<Record<string, OauthStatus>>({});
   const [connecting, setConnecting] = useState<string | null>(null);
+  const [notifyByEmail, setNotifyByEmail] = useState(true);
+  const [notifySaving, setNotifySaving] = useState(false);
   const [error] = useState<string | null>(() => {
     const code = searchParams.get("error");
     return code ? oauthErrorMessage(code) : null;
@@ -77,7 +79,30 @@ export default function IntegrationsSettingsPage() {
         setOauthStatus(Object.fromEntries(data.integrations.map((i) => [i.provider, i])));
       })
       .catch(() => {});
+
+    fetch("/api/integrations/google-search-console/notifications")
+      .then((res) => res.json())
+      .then((data: { enabled?: boolean }) => setNotifyByEmail(data.enabled ?? true))
+      .catch(() => {});
   }, []);
+
+  async function handleToggleNotify() {
+    const next = !notifyByEmail;
+    setNotifySaving(true);
+    setNotifyByEmail(next);
+    try {
+      const res = await fetch("/api/integrations/google-search-console/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: next }),
+      });
+      if (!res.ok) setNotifyByEmail(!next);
+    } catch {
+      setNotifyByEmail(!next);
+    } finally {
+      setNotifySaving(false);
+    }
+  }
 
   async function handleDisconnect(provider: string) {
     setConnecting(provider);
@@ -159,6 +184,18 @@ export default function IntegrationsSettingsPage() {
                   </div>
                   {connected ? (
                     <div className="flex shrink-0 items-center gap-2">
+                      {integration.name === "Google Search Console" && (
+                        <label className="flex items-center gap-2 text-xs text-muted">
+                          <input
+                            type="checkbox"
+                            checked={notifyByEmail}
+                            disabled={notifySaving}
+                            onChange={handleToggleNotify}
+                            className="h-4 w-4"
+                          />
+                          Email me about sitemap issues &amp; weekly reports
+                        </label>
+                      )}
                       {integration.name === "GitHub" && (
                         <a
                           href="/github/select-repo"

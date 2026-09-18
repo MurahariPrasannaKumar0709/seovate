@@ -7,11 +7,12 @@ import Tag from "@/components/ui/Tag";
 import { Button } from "@/components/ui/Button";
 import { SketchBox, InfoCallout } from "@/components/ui/SketchBox";
 
-type MissingFile = { path: string; content: string };
+type FileStatus = "missing" | "outdated" | "up_to_date";
+type FileChange = { path: string; status: FileStatus; content: string | null };
 type AuditStats = { crawledPages: number; repoPages: number; totalPages: number; repoTruncated: boolean };
 type PreviewResponse =
   | { error: string; status?: number }
-  | { missing: MissingFile[]; stats: AuditStats; allPresent: boolean };
+  | { changes: FileChange[]; stats: AuditStats; allPresent: boolean };
 
 export default function GitHubConsentPage() {
   const router = useRouter();
@@ -77,7 +78,10 @@ export default function GitHubConsentPage() {
           </Link>
           <h1 className="mt-4 text-2xl font-bold">Nothing to change</h1>
           <div className="mt-6">
-            <InfoCallout>sitemap.xml and robots.txt are both already present in the repo.</InfoCallout>
+            <InfoCallout>
+              sitemap.xml and robots.txt are both already present and match your live site — nothing
+              to update.
+            </InfoCallout>
           </div>
         </div>
       </main>
@@ -94,12 +98,12 @@ export default function GitHubConsentPage() {
           <Tag variant="success">Requires your approval</Tag>
         </div>
         <h1 className="mt-4 text-[28px] font-bold">
-          Seovate wants to add {preview.missing.length} file{preview.missing.length === 1 ? "" : "s"}
+          Seovate wants to change {preview.changes.length} file{preview.changes.length === 1 ? "" : "s"}
         </h1>
         <p className="mt-3 text-muted">
-          This is different from routine SEO fixes, which Seovate makes automatically. New or
-          restructured files in your repository always go through a pull request — Seovate will
-          never commit directly to your codebase.
+          This is different from routine SEO fixes, which Seovate makes automatically. New,
+          updated, or restructured files in your repository always go through a pull request —
+          Seovate will never commit directly to your codebase.
         </p>
         <p className="mt-2 text-muted">
           Generated from {preview.stats.totalPages} page{preview.stats.totalPages === 1 ? "" : "s"} total —{" "}
@@ -116,12 +120,14 @@ export default function GitHubConsentPage() {
         )}
 
         <div className="mt-8 flex flex-col gap-6">
-          {preview.missing.map((change) => (
+          {preview.changes.map((change) => (
             <SketchBox key={change.path} className="p-5">
               <div className="flex items-center gap-3">
                 <input type="checkbox" defaultChecked readOnly className="h-4 w-4" />
                 <span className="font-mono text-sm font-bold">{change.path}</span>
-                <Tag variant="success">New file</Tag>
+                <Tag variant={change.status === "missing" ? "success" : "warn"}>
+                  {change.status === "missing" ? "New file" : "Update"}
+                </Tag>
               </div>
               <pre className="mt-3 max-h-64 overflow-auto rounded bg-ink p-4 font-mono text-[13px] leading-relaxed text-[#7ec99a]">
                 {change.content}

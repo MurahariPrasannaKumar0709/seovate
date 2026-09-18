@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/getSession";
 import { getGitHubSelection } from "@/lib/integrations/githubSelection";
-import { getFileContent, GitHubApiError } from "@/lib/integrations/githubClient";
+import { GitHubApiError } from "@/lib/integrations/githubClient";
+import { auditSeoFiles } from "@/lib/integrations/fileAudit";
 
-const EXPECTED_FILES = [
-  { path: "sitemap.xml", description: "Tells search engines every page on your site" },
-  { path: "robots.txt", description: "Tells crawlers what they're allowed to index" },
-];
+const DESCRIPTIONS: Record<string, string> = {
+  "sitemap.xml": "Tells search engines every page on your site",
+  "robots.txt": "Tells crawlers what they're allowed to index",
+};
 
 export async function GET(req: NextRequest) {
   const user = await getSessionUser(req);
@@ -18,18 +19,18 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const files = await Promise.all(
-      EXPECTED_FILES.map(async (f) => {
-        const existing = await getFileContent(selection.accessToken, selection.repoFullName, f.path);
-        return { path: f.path, description: f.description, present: existing !== null };
-      })
-    );
+    const { files } = await auditSeoFiles(selection);
+    const reported = files.map((f) => ({
+      path: f.path,
+      description: DESCRIPTIONS[f.path.split("/").pop() ?? f.path] ?? "",
+      status: f.status,
+    }));
     return NextResponse.json({
       selected: true,
       repoFullName: selection.repoFullName,
       siteUrl: selection.siteUrl,
-      files,
-      allPresent: files.every((f) => f.present),
+      files: reported,
+      allPresent: reported.every((f) => f.status === "up_to_date"),
     });
   } catch (err) {
     const status = err instanceof GitHubApiError ? err.status : 500;

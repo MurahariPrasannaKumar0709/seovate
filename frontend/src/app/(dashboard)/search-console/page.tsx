@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { SketchBox, StatCard, InfoCallout } from "@/components/ui/SketchBox";
-import { LinkButton } from "@/components/ui/Button";
+import { Button, LinkButton } from "@/components/ui/Button";
 
 type Totals = { clicks: number; impressions: number; ctr: number; position: number };
 type DailyPoint = { date: string; clicks: number; impressions: number };
@@ -10,8 +11,16 @@ type QueryRow = { query: string; clicks: number; impressions: number; ctr: numbe
 type PageRow = { page: string; clicks: number; impressions: number; ctr: number; position: number };
 type CountryRow = { country: string; clicks: number; impressions: number };
 type DeviceRow = { device: string; clicks: number; impressions: number };
-type SitemapSummary = { path: string; submitted: number; indexed: number; lastSubmitted: string | null };
+type SitemapSummary = {
+  path: string;
+  submitted: number;
+  indexed: number;
+  lastSubmitted: string | null;
+  errors: string | null;
+  warnings: string | null;
+};
 type Site = { siteUrl: string; permissionLevel: string };
+type LinkedRepo = { repoFullName: string; prNumber: number | null };
 
 type SearchConsoleData = {
   connected: boolean;
@@ -19,6 +28,7 @@ type SearchConsoleData = {
   apiStatus?: number;
   sites?: Site[];
   selectedSite?: string;
+  linkedRepo?: LinkedRepo | null;
   dateRange?: { start: string; end: string };
   totals?: Totals;
   daily?: DailyPoint[];
@@ -103,6 +113,9 @@ export default function SearchConsolePage() {
   const [site, setSite] = useState<string | null>(null);
   const [tab, setTab] = useState<TabName>("Queries");
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [confirmingResubmit, setConfirmingResubmit] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -115,6 +128,33 @@ export default function SearchConsolePage() {
       })
       .finally(() => setLoading(false));
   }, [site]);
+
+  async function handleSubmitSitemap() {
+    if (!data?.selectedSite) return;
+    setSubmitting(true);
+    setSubmitMessage(null);
+    try {
+      const res = await fetch("/api/integrations/google-search-console/submit-sitemap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siteUrl: data.selectedSite, feedpath: "sitemap.xml" }),
+      });
+      const result = await res.json();
+      if (!res.ok || result.error) {
+        setSubmitMessage("Couldn't submit the sitemap to Search Console. Try again in a moment.");
+        return;
+      }
+      setSubmitMessage("Submitted sitemap.xml to Search Console.");
+      const qs = `?site=${encodeURIComponent(data.selectedSite)}`;
+      fetch(`/api/integrations/google-search-console/data${qs}`)
+        .then((res) => res.json())
+        .then(setData);
+    } catch {
+      setSubmitMessage("Couldn't reach the server. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   const ctrPct = useMemo(
     () => (data?.totals ? `${(data.totals.ctr * 100).toFixed(1)}%` : "—"),
@@ -191,6 +231,9 @@ export default function SearchConsolePage() {
   const totals = data.totals ?? { clicks: 0, impressions: 0, ctr: 0, position: 0 };
   const daily = data.daily ?? [];
   const indexing = data.indexing ?? { totalSubmitted: 0, totalIndexed: 0, sitemaps: [] };
+  const sitemapIssues = indexing.sitemaps.filter(
+    (sm) => (parseInt(sm.errors ?? "0", 10) || 0) > 0 || (parseInt(sm.warnings ?? "0", 10) || 0) > 0
+  );
 
   return (
     <main className="flex-1 bg-paper">
@@ -217,6 +260,14 @@ export default function SearchConsolePage() {
       </header>
 
       <div className="mx-auto max-w-[960px] px-8 py-10">
+        {data.linkedRepo && (
+          <p className="mb-3 text-xs text-muted">
+            Connected repo for this domain:{" "}
+            <Link href="/github/repo-scan" className="font-mono font-bold text-ink hover:underline">
+              {data.linkedRepo.repoFullName}
+            </Link>
+          </p>
+        )}
         {data.dateRange && (
           <p className="text-xs text-muted">
             {data.dateRange.start} → {data.dateRange.end}
@@ -238,21 +289,74 @@ export default function SearchConsolePage() {
         </SketchBox>
 
         <SketchBox className="mt-6 p-5">
-          <h2 className="font-bold">Indexing</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-bold">Indexing</h2>
+            <Button type="button" variant="ghost" disabled={submitting} onClick={handleSubmitSitemap}>
+              {submitting ? "Submitting…" : "Submit sitemap.xml →"}
+            </Button>
+          </div>
           <p className="mt-1 text-sm text-muted">
             {indexing.totalIndexed} of {indexing.totalSubmitted} submitted URLs indexed, across{" "}
             {indexing.sitemaps.length} sitemap{indexing.sitemaps.length === 1 ? "" : "s"}.
           </p>
+          {submitMessage && <p className="mt-2 text-sm text-muted">{submitMessage}</p>}
           {indexing.sitemaps.length > 0 && (
             <div className="mt-4 flex flex-col gap-2">
-              {indexing.sitemaps.map((sm) => (
-                <div key={sm.path} className="flex items-center justify-between border-t border-[#eeece2] pt-2 text-sm">
-                  <span className="font-mono">{sm.path}</span>
-                  <span className="text-muted">
-                    {sm.indexed}/{sm.submitted} indexed
-                  </span>
+              {indexing.sitemaps.map((sm) => {
+                const errorCount = parseInt(sm.errors ?? "0", 10) || 0;
+                const warningCount = parseInt(sm.warnings ?? "0", 10) || 0;
+                return (
+                  <div key={sm.path} className="border-t border-[#eeece2] pt-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono">{sm.path}</span>
+                      <span className="text-muted">
+                        {sm.indexed}/{sm.submitted} indexed
+                      </span>
+                    </div>
+                    {(errorCount > 0 || warningCount > 0) && (
+                      <p className="mt-1 text-xs text-warn">
+                        {errorCount > 0 && `${errorCount} error${errorCount === 1 ? "" : "s"}`}
+                        {errorCount > 0 && warningCount > 0 && ", "}
+                        {warningCount > 0 && `${warningCount} warning${warningCount === 1 ? "" : "s"}`}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {sitemapIssues.length > 0 && (
+            <div className="mt-4 rounded border-2 border-warn bg-warn-soft p-4">
+              <p className="text-sm font-bold text-warn">
+                Search Console reported {sitemapIssues.length} issue{sitemapIssues.length === 1 ? "" : "s"}.
+              </p>
+              {!confirmingResubmit ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="mt-3"
+                  onClick={() => setConfirmingResubmit(true)}
+                >
+                  Resubmit sitemap.xml →
+                </Button>
+              ) : (
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <p className="text-sm text-warn">Re-submit sitemap.xml to Search Console now?</p>
+                  <Button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => {
+                      setConfirmingResubmit(false);
+                      handleSubmitSitemap();
+                    }}
+                  >
+                    {submitting ? "Submitting…" : "Confirm resubmit"}
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setConfirmingResubmit(false)}>
+                    Cancel
+                  </Button>
                 </div>
-              ))}
+              )}
             </div>
           )}
         </SketchBox>

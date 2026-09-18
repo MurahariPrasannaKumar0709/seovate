@@ -69,3 +69,19 @@ export async function listSitemaps(accessToken: string, siteUrl: string): Promis
   );
   return data.sitemap ?? [];
 }
+
+/** Registers (or re-pings) a sitemap feed with Search Console — `sites.sitemaps.submit`. Takes a
+ *  feed *path* relative to the site (e.g. "sitemap.xml"), not a full URL. There's no equivalent
+ *  submit call for robots.txt — Google discovers and re-crawls it automatically once it's live at
+ *  the site's root, it's never "registered" the way a sitemap is. */
+export async function submitSitemap(accessToken: string, siteUrl: string, feedpath: string): Promise<void> {
+  const res = await fetch(
+    `${WEBMASTERS_BASE}/sites/${encodeURIComponent(siteUrl)}/sitemaps/${encodeURIComponent(feedpath)}`,
+    { method: "PUT", headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error(`Search Console sitemap submit for ${feedpath} failed (${res.status}):`, body);
+    throw new SearchConsoleError(`Search Console sitemap submit for ${feedpath} failed: ${body}`, res.status);
+  }
+}

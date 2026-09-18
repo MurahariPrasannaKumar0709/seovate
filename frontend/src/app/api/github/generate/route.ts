@@ -2,81 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/getSession";
 import { getGitHubSelection } from "@/lib/integrations/githubSelection";
 import {
-  getFileContent,
   getRef,
-  getRepoTree,
   createBranch,
   createOrUpdateFile,
   createPullRequest,
   getRepo,
   GitHubApiError,
 } from "@/lib/integrations/githubClient";
-import { crawlSite, verifyUrlsLive } from "@/lib/integrations/siteCrawler";
-import {
-  deriveDisallowRules,
-  derivePagesFromRepo,
-  generateRobotsTxt,
-  generateSitemapXml,
-} from "@/lib/integrations/seoFiles";
+import { auditSeoFiles, type FileAuditEntry } from "@/lib/integrations/fileAudit";
 import { prisma } from "@/lib/prisma";
 
-type MissingFile = { path: string; content: string };
-type AuditStats = { crawledPages: number; repoPages: number; totalPages: number; repoTruncated: boolean };
-
-async function buildMissingFiles(selection: {
-  accessToken: string;
-  repoFullName: string;
-  siteUrl: string | null;
-}): Promise<{ missing: MissingFile[]; stats: AuditStats }> {
-  if (!selection.siteUrl) throw new Error("No site URL configured to audit.");
-
-  const [sitemap, robots, repo] = await Promise.all([
-    getFileContent(selection.accessToken, selection.repoFullName, "sitemap.xml"),
-    getFileContent(selection.accessToken, selection.repoFullName, "robots.txt"),
-    getRepo(selection.accessToken, selection.repoFullName),
-  ]);
-
-  const missing: MissingFile[] = [];
-  const stats: AuditStats = { crawledPages: 0, repoPages: 0, totalPages: 0, repoTruncated: false };
-
-  if (!sitemap || !robots) {
-    const origin = new URL(selection.siteUrl).origin;
-
-    const [crawledUrls, tree] = await Promise.all([
-      crawlSite(selection.siteUrl),
-      getRepoTree(selection.accessToken, selection.repoFullName, repo.default_branch),
-    ]);
-
-    const repoRoutes = derivePagesFromRepo(tree.entries);
-    const crawledSet = new Set(crawledUrls);
-    const repoUrlCandidates = repoRoutes
-      .map((route) => new URL(route, origin).toString())
-      .filter((url) => !crawledSet.has(url));
-
-    // Repo-derived routes are guesses from file names/conventions — confirm each one actually
-    // resolves live before trusting it, so unused template/demo/draft pages in the repo don't end
-    // up as broken URLs in the sitemap. Crawled URLs are already known-live (the crawler only
-    // followed links it found on pages that returned 200).
-    const verifiedRepoUrls = await verifyUrlsLive(repoUrlCandidates);
-
-    const allUrls = Array.from(new Set([...crawledUrls, ...verifiedRepoUrls]));
-    stats.crawledPages = crawledUrls.length;
-    stats.repoPages = verifiedRepoUrls.length;
-    stats.totalPages = allUrls.length;
-    stats.repoTruncated = tree.truncated;
-
-    if (!sitemap) missing.push({ path: "sitemap.xml", content: generateSitemapXml(allUrls) });
-    if (!robots) {
-      const disallowRules = deriveDisallowRules(tree.entries);
-      missing.push({ path: "robots.txt", content: generateRobotsTxt(selection.siteUrl, disallowRules) });
-    }
-  }
-
-  return { missing, stats };
-}
-
 /** Dry-run preview: audits the live site AND the repo's own file structure, and returns the file
- *  contents Seovate would add, without touching the repo. */
+ *  contents Seovate would add or update, without touching the repo. Existing files whose content
+ *  still matches the audit (nothing added/removed since the last PR) are left out — only
+ *  missing/outdated files are reported as changes. */
 export async function GET(req: NextRequest) {
   const user = await getSessionUser(req);
   if (!user) return NextResponse.json({ error: "Not logged in." }, { status: 401 });
@@ -85,15 +24,16 @@ export async function GET(req: NextRequest) {
   if (!selection) return NextResponse.json({ error: "No repo selected." }, { status: 400 });
 
   try {
-    const { missing, stats } = await buildMissingFiles(selection);
-    return NextResponse.json({ missing, stats, allPresent: missing.length === 0 });
+    const { files, stats } = await auditSeoFiles(selection);
+    const changes = files.filter((f) => f.status !== "up_to_date");
+    return NextResponse.json({ changes, stats, allPresent: changes.length === 0 });
   } catch (err) {
     const status = err instanceof GitHubApiError ? err.status : 500;
     return NextResponse.json({ error: "generate_failed", status }, { status: 200 });
   }
 }
 
-/** Creates a branch, commits the missing files, and opens a real pull request. */
+/** Creates a branch, commits the missing/outdated files, and opens a real pull request. */
 export async function POST(req: NextRequest) {
   const user = await getSessionUser(req);
   if (!user) return NextResponse.json({ error: "Not logged in." }, { status: 401 });
@@ -102,9 +42,13 @@ export async function POST(req: NextRequest) {
   if (!selection) return NextResponse.json({ error: "No repo selected." }, { status: 400 });
 
   try {
-    const { missing } = await buildMissingFiles(selection);
-    if (missing.length === 0) {
-      return NextResponse.json({ error: "Nothing to generate — both files already exist." }, { status: 400 });
+    const { files } = await auditSeoFiles(selection);
+    const changes: FileAuditEntry[] = files.filter((f) => f.status !== "up_to_date");
+    if (changes.length === 0) {
+      return NextResponse.json(
+        { error: "Nothing to generate — sitemap.xml and robots.txt are both already up to date." },
+        { status: 400 }
+      );
     }
 
     const repo = await getRepo(selection.accessToken, selection.repoFullName);
@@ -113,22 +57,31 @@ export async function POST(req: NextRequest) {
     const baseSha = await getRef(selection.accessToken, selection.repoFullName, baseBranch);
     await createBranch(selection.accessToken, selection.repoFullName, branchName, baseSha);
 
-    for (const file of missing) {
+    for (const file of changes) {
+      const verb = file.status === "missing" ? "Add" : "Update";
       await createOrUpdateFile(
         selection.accessToken,
         selection.repoFullName,
         file.path,
-        file.content,
-        `Add ${file.path} (Seovate SEO scaffolding)`,
-        branchName
+        file.content!,
+        `${verb} ${file.path} (Seovate SEO scaffolding)`,
+        branchName,
+        file.sha ?? undefined
       );
     }
+
+    const added = changes.filter((f) => f.status === "missing").map((f) => f.path);
+    const updated = changes.filter((f) => f.status === "outdated").map((f) => f.path);
+    const titleParts = [
+      added.length > 0 ? `Add ${added.join(" and ")}` : null,
+      updated.length > 0 ? `Update ${updated.join(" and ")}` : null,
+    ].filter(Boolean);
 
     const pr = await createPullRequest(
       selection.accessToken,
       selection.repoFullName,
-      `Add ${missing.map((f) => f.path).join(" and ")}`,
-      "Opened automatically by Seovate after auditing both the live site and this repo's file structure — adds the missing SEO scaffolding files listed in the title. Nothing is merged until you approve it, here or on GitHub.",
+      titleParts.join(", "),
+      "Opened automatically by Seovate after auditing both the live site and this repo's file structure — adds or updates the SEO scaffolding files listed in the title to match what's actually live. Nothing is merged until you approve it, here or on GitHub.",
       branchName,
       baseBranch
     );

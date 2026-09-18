@@ -49,6 +49,14 @@ model Integration {
   repoFullName     String?
   siteUrl          String?
   lastPrNumber     Int?
+  // Google Search Console monitoring: whether to email this user about sitemap issues/weekly
+  // reports, the last time a monitoring check ran, a JSON snapshot of sitemap path -> {errors,
+  // warnings} from that check (used to only email on new/changed issues, not every run), and the
+  // last time a weekly report email went out (so an hourly cron doesn't resend it).
+  notifyByEmail      Boolean   @default(true)
+  lastSitemapCheckAt DateTime?
+  lastSitemapIssues  String?
+  lastReportSentAt   DateTime?
   connectedAt      DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
