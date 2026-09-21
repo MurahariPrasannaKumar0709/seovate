@@ -35,9 +35,16 @@ audits: [{id, title, description, score, scoreDisplayMode, displayValue}] }`.
 
 ## Deploying on Render
 
-Create a new **Web Service** (Node), root directory `lighthouse-service`, build command
-`npm install`, start command `npm start`. Set `LIGHTHOUSE_SERVICE_SECRET` in its Environment tab
-— same value goes into the frontend's `LIGHTHOUSE_SERVICE_SECRET` env var, and the frontend's
-`LIGHTHOUSE_SERVICE_URL` should point at this service's Render URL. A free-tier instance is
-enough for on-demand use but will cold-start after idling (Chromium launch + a full Lighthouse
-run already takes 15-30s even warm).
+Create a new **Web Service** with **Docker** as the runtime (not Node) — Render's plain Node
+build environment runs as a non-root user, so Playwright's `postinstall` (`playwright install
+--with-deps chromium`, which needs root to `apt-get` OS-level libs) fails there with `su:
+Authentication failure`. The included `Dockerfile` sidesteps this by building on Microsoft's
+`mcr.microsoft.com/playwright:v1.48.2-jammy` base image, which already ships Chromium plus all
+its OS dependencies — `npm install` runs with `--ignore-scripts` so it doesn't re-attempt the
+postinstall inside the container.
+
+Root directory `lighthouse-service`, environment **Docker** (Render auto-detects the Dockerfile).
+Set `LIGHTHOUSE_SERVICE_SECRET` in its Environment tab — same value goes into the frontend's
+`LIGHTHOUSE_SERVICE_SECRET` env var, and the frontend's `LIGHTHOUSE_SERVICE_URL` should point at
+this service's Render URL. A free-tier instance is enough for on-demand use but will cold-start
+after idling (Chromium launch + a full Lighthouse run already takes 15-30s even warm).
