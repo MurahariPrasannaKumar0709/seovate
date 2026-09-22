@@ -43,6 +43,12 @@ type FixResult =
   | { error: string; message?: string; skipped?: SkippedItem[] };
 
 type DiffFile = { filename: string; status: string; additions: number; deletions: number; patch: string | null };
+type DeployStatus = {
+  exists: boolean;
+  reverted?: boolean;
+  sha?: string;
+  status?: { state: "pending" | "success" | "failure" | "error" | "unknown"; description: string | null; targetUrl: string | null };
+};
 
 const AUTO_FIXABLE_RULES = new Set([
   "CANONICAL_MISSING",
@@ -108,9 +114,14 @@ export default function TechnicalSeoPage() {
   const [fixing, setFixing] = useState(false);
   const [fixResult, setFixResult] = useState<FixResult | null>(null);
   const [prAction, setPrAction] = useState<"merge" | "close" | "delete" | null>(null);
+  const [deployStatus, setDeployStatus] = useState<DeployStatus | null>(null);
+  const [checkingDeploy, setCheckingDeploy] = useState(false);
+  const [reverting, setReverting] = useState(false);
   const scanTimer = useLoadingTimer();
   const fixTimer = useLoadingTimer();
   const prActionTimer = useLoadingTimer();
+  const deployTimer = useLoadingTimer();
+  const revertTimer = useLoadingTimer();
 
   useEffect(() => {
     fetch("/api/technical-seo/scan")
@@ -127,7 +138,12 @@ export default function TechnicalSeoPage() {
   function loadFixPrStatus(scanId: string) {
     fetch(`/api/technical-seo/fix?scanId=${scanId}`)
       .then((res) => res.json())
-      .then((data: FixPrStatus) => setFixPr(data))
+      .then((data: FixPrStatus) => {
+        setFixPr(data);
+        // A merge from an earlier session — show its current deploy state (one check, not the
+        // repeating poll used right after clicking Merge, since it may have resolved long ago).
+        if (data.status === "merged") pollDeployStatus(scanId, 0);
+      })
       .catch(() => {});
   }
 
@@ -167,9 +183,51 @@ export default function TechnicalSeoPage() {
         body: JSON.stringify({ scanId: scan.id }),
       });
       loadFixPrStatus(scan.id);
+      if (action === "merge") pollDeployStatus(scan.id);
     } finally {
       setPrAction(null);
       prActionTimer.stop();
+    }
+  }
+
+  /** Vercel's build typically takes 20-60s, so a single check right after merging usually just
+   *  finds "pending" — poll every 10s for up to 2 minutes, stopping early once it resolves. */
+  async function pollDeployStatus(scanId: string, attemptsLeft = 12) {
+    setCheckingDeploy(true);
+    deployTimer.start();
+    try {
+      const res = await fetch(`/api/technical-seo/fix/deploy-status?scanId=${scanId}`);
+      const data: DeployStatus = await res.json();
+      setDeployStatus(data);
+      if (data.status?.state === "pending" && attemptsLeft > 0) {
+        setTimeout(() => pollDeployStatus(scanId, attemptsLeft - 1), 10_000);
+        return;
+      }
+    } catch {
+      // leave whatever deployStatus we last had — a transient network error here isn't worth
+      // surfacing over the deploy status itself.
+    }
+    setCheckingDeploy(false);
+    deployTimer.stop();
+  }
+
+  async function revertMerge() {
+    if (!scan) return;
+    if (!window.confirm("Revert this merge on GitHub? This creates a new commit undoing the fix — it won't rewrite history.")) {
+      return;
+    }
+    setReverting(true);
+    revertTimer.start();
+    try {
+      await fetch("/api/technical-seo/fix/revert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scanId: scan.id }),
+      });
+      pollDeployStatus(scan.id);
+    } finally {
+      setReverting(false);
+      revertTimer.stop();
     }
   }
 
@@ -315,8 +373,14 @@ export default function TechnicalSeoPage() {
               fixResult={fixResult}
               prAction={prAction}
               prActionSeconds={prActionTimer.seconds}
+              deployStatus={deployStatus}
+              checkingDeploy={checkingDeploy}
+              deploySeconds={deployTimer.seconds}
+              reverting={reverting}
+              revertSeconds={revertTimer.seconds}
               onOpenFixPr={openFixPr}
               onActOnFixPr={actOnFixPr}
+              onRevert={revertMerge}
             />
           </>
         )}
@@ -358,8 +422,14 @@ function FixIssuesSection({
   fixResult,
   prAction,
   prActionSeconds,
+  deployStatus,
+  checkingDeploy,
+  deploySeconds,
+  reverting,
+  revertSeconds,
   onOpenFixPr,
   onActOnFixPr,
+  onRevert,
 }: {
   scan: Scan;
   githubRepoConnected: boolean;
@@ -369,8 +439,14 @@ function FixIssuesSection({
   fixResult: FixResult | null;
   prAction: "merge" | "close" | "delete" | null;
   prActionSeconds: number;
+  deployStatus: DeployStatus | null;
+  checkingDeploy: boolean;
+  deploySeconds: number;
+  reverting: boolean;
+  revertSeconds: number;
   onOpenFixPr: () => void;
   onActOnFixPr: (action: "merge" | "close" | "delete") => void;
+  onRevert: () => void;
 }) {
   const fixableCount = scan.findings.filter((f) => AUTO_FIXABLE_RULES.has(f.ruleId)).length;
   if (fixableCount === 0) return null;
@@ -475,6 +551,54 @@ function FixIssuesSection({
               label={prAction === "merge" ? "Merging" : prAction === "close" ? "Closing" : "Deleting"}
             />
           </div>
+
+          {fixPr.status === "merged" && (
+            <div className="mt-3 border-t border-[#eeece2] pt-3">
+              <p className="text-sm font-bold">Deployment</p>
+              {checkingDeploy && !deployStatus?.status && (
+                <LoadingTimer active={checkingDeploy} seconds={deploySeconds} label="Checking deployment status" />
+              )}
+              {deployStatus?.status && (
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <Tag
+                    variant={
+                      deployStatus.status.state === "success"
+                        ? "success"
+                        : deployStatus.status.state === "failure" || deployStatus.status.state === "error"
+                          ? "warn"
+                          : "pending"
+                    }
+                  >
+                    {deployStatus.reverted ? "reverted" : deployStatus.status.state}
+                  </Tag>
+                  <span className="text-sm text-muted">{deployStatus.status.description}</span>
+                  {deployStatus.status.targetUrl && (
+                    <a href={deployStatus.status.targetUrl} target="_blank" rel="noreferrer" className="text-sm font-bold text-accent">
+                      View deployment ↗
+                    </a>
+                  )}
+                </div>
+              )}
+              {deployStatus?.status?.state === "pending" && (
+                <LoadingTimer active={checkingDeploy} seconds={deploySeconds} label="Still deploying — checking again shortly" />
+              )}
+              {(deployStatus?.status?.state === "failure" || deployStatus?.status?.state === "error") && !deployStatus.reverted && (
+                <div className="mt-2 flex flex-col gap-2">
+                  <p className="text-sm text-warn">
+                    The deployment for this merge failed — the fix likely didn&apos;t break your code
+                    logically, but something in this change didn&apos;t build. You can revert it to restore
+                    the pre-fix state while you investigate.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="ghost" disabled={reverting} onClick={onRevert}>
+                      {reverting ? "Reverting…" : "Revert this merge"}
+                    </Button>
+                    <LoadingTimer active={reverting} seconds={revertSeconds} label="Reverting" />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <DiffViewer scanId={scan.id} />
         </SketchBox>

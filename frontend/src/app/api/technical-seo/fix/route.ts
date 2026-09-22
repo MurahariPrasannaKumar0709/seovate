@@ -4,6 +4,7 @@ import { getGitHubSelection } from "@/lib/integrations/githubSelection";
 import { prisma } from "@/lib/prisma";
 import { planPageFixes, titleFromSlug, descriptionFromTitle, type DesiredPageFixes } from "@/lib/integrations/pageMetadataFix";
 import { planDeadLinkRemovals, removeLinksTo } from "@/lib/integrations/deadLinkFix";
+import { findSyntaxErrors } from "@/lib/integrations/codeValidation";
 import {
   getRepo,
   getRef,
@@ -162,9 +163,30 @@ export async function POST(req: NextRequest) {
       filesByPath.set(t.path, reapplied.removedCount > 0 ? reapplied.content : existing);
     }
 
+    // Quality gate: never commit a file that doesn't even parse as valid syntax. This can't catch
+    // everything (it has no project context, so a cross-file type error like an inferred `never[]`
+    // slips through — that's what the required post-merge deploy check below is for), but it's a
+    // real, cheap backstop against a string-splicing edit producing outright malformed output, and
+    // it runs with zero code execution (see codeValidation.ts for why that matters here).
+    const syntaxSkipped: { path: string; reasons: string[] }[] = [];
+    for (const [path, content] of filesByPath) {
+      const errors = findSyntaxErrors(content, path);
+      if (errors.length > 0) {
+        syntaxSkipped.push({ path, reasons: errors });
+        filesByPath.delete(path);
+      }
+    }
+    const invalidPaths = new Set(syntaxSkipped.map((s) => s.path));
+    const validMetadataTargets = metadataTargets.filter((t) => !invalidPaths.has(t.path));
+    const validLinkTargets = linkTargets.filter((t) => !invalidPaths.has(t.path));
+    const syntaxSkippedFindings = syntaxSkipped.map((s) => ({
+      url: s.path,
+      reason: `Generated edit failed a syntax check, so it was left out of the PR: ${s.reasons[0]}`,
+    }));
+
     if (filesByPath.size === 0) {
       return NextResponse.json(
-        { error: "no_fixable_findings", skipped: [...metadataSkipped, ...linkSkipped] },
+        { error: "no_fixable_findings", skipped: [...metadataSkipped, ...linkSkipped, ...syntaxSkippedFindings] },
         { status: 200 }
       );
     }
@@ -186,16 +208,17 @@ export async function POST(req: NextRequest) {
       `Automated fixes from Seovate's technical-SEO audit — ${files.length} file${files.length === 1 ? "" : "s"} changed, one commit.`,
       "",
       "**Fixed:**",
-      ...metadataTargets.map((t) => `- \`${t.path}\` (${t.url}) — ${t.fixedFields.join(", ")}`),
-      ...linkTargets.map((t) => `- \`${t.path}\` — removed ${t.occurrences} dead link${t.occurrences === 1 ? "" : "s"} to ${t.brokenUrl}`),
+      ...validMetadataTargets.map((t) => `- \`${t.path}\` (${t.url}) — ${t.fixedFields.join(", ")}`),
+      ...validLinkTargets.map((t) => `- \`${t.path}\` — removed ${t.occurrences} dead link${t.occurrences === 1 ? "" : "s"} to ${t.brokenUrl}`),
     ];
-    const allSkipped = [...metadataSkipped, ...linkSkipped];
+    const allSkipped = [...metadataSkipped, ...linkSkipped, ...syntaxSkippedFindings];
     if (allSkipped.length > 0) {
       bodyLines.push(
         "",
         "**Not fixed automatically (needs a human look):**",
         ...metadataSkipped.map((s) => `- ${s.url} — ${s.reason}`),
-        ...linkSkipped.map((s) => `- ${s.brokenUrl} — ${s.reason}`)
+        ...linkSkipped.map((s) => `- ${s.brokenUrl} — ${s.reason}`),
+        ...syntaxSkippedFindings.map((s) => `- ${s.url} — ${s.reason}`)
       );
     }
     bodyLines.push(
@@ -221,8 +244,8 @@ export async function POST(req: NextRequest) {
       prNumber: pr.number,
       prUrl: pr.html_url,
       fixed: [
-        ...metadataTargets.map((t) => ({ url: t.url, path: t.path, fields: t.fixedFields })),
-        ...linkTargets.map((t) => ({ url: t.brokenUrl, path: t.path, fields: ["removed dead link"] })),
+        ...validMetadataTargets.map((t) => ({ url: t.url, path: t.path, fields: t.fixedFields })),
+        ...validLinkTargets.map((t) => ({ url: t.brokenUrl, path: t.path, fields: ["removed dead link"] })),
       ],
       skipped: allSkipped,
     });

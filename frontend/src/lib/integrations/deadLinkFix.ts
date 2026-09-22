@@ -202,7 +202,13 @@ function findEnclosingLinkElement(content: string, hrefIndex: number): { start: 
 
 /** Finds the `{ href: "...", ... }` object-literal entry a `href:` match at `hrefIndex` belongs
  *  to (the nav-items-data-array shape), including one adjacent comma so the array stays valid
- *  JS after the entry is removed. Returns null if the enclosing braces can't be matched. */
+ *  JS after the entry is removed. Returns null if the enclosing braces can't be matched, or if
+ *  removing this entry would leave its enclosing array with no other object entries — an empty
+ *  array literal (`[]`) gets inferred by TypeScript as `never[]`, which breaks any `.map(item =>
+ *  item.label)` call site on it. That exact failure broke a real Vercel build (both entries of a
+ *  2-item nav array were dead links, and removing both independently emptied it) — skip rather
+ *  than risk it again, leaving the dead link in place for a human to clean up along with the rest
+ *  of the now-pointless array. */
 function findEnclosingObjectEntry(content: string, hrefIndex: number): { start: number; end: number } | null {
   let depth = 0;
   let openIndex: number | null = null;
@@ -233,7 +239,54 @@ function findEnclosingObjectEntry(content: string, hrefIndex: number): { start: 
     const beforeMatch = /,\s*$/.exec(content.slice(0, start));
     if (beforeMatch) start -= beforeMatch[0].length;
   }
+
+  const arrayBounds = findEnclosingSquareBrackets(content, openIndex);
+  if (arrayBounds) {
+    const remainingBody = content.slice(arrayBounds.open + 1, start) + content.slice(end, arrayBounds.close);
+    if (!remainingBody.includes("{")) return null;
+  }
+
   return { start, end };
+}
+
+/** Finds the `[`...`]` bounds of the array literal enclosing `beforeIndex` (scanning backward for
+ *  the nearest un-matched `[`, then forward for its matching `]`), or null if it isn't inside one. */
+function findEnclosingSquareBrackets(content: string, beforeIndex: number): { open: number; close: number } | null {
+  let depth = 0;
+  let openIndex: number | null = null;
+  for (let i = beforeIndex - 1; i >= 0; i--) {
+    const ch = content[i];
+    if (ch === "]") depth++;
+    else if (ch === "[") {
+      if (depth === 0) {
+        openIndex = i;
+        break;
+      }
+      depth--;
+    }
+  }
+  if (openIndex === null) return null;
+
+  let bracketDepth = 0;
+  let inString: '"' | "'" | "`" | null = null;
+  for (let i = openIndex; i < content.length; i++) {
+    const ch = content[i];
+    const prev = content[i - 1];
+    if (inString) {
+      if (ch === inString && prev !== "\\") inString = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      inString = ch;
+      continue;
+    }
+    if (ch === "[") bracketDepth++;
+    else if (ch === "]") {
+      bracketDepth--;
+      if (bracketDepth === 0) return { open: openIndex, close: i };
+    }
+  }
+  return null;
 }
 
 function escapeRegExp(s: string): string {

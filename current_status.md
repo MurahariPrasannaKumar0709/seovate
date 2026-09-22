@@ -45,7 +45,7 @@ proposed order.
 | 6 | Lighthouse | ✅ Done (pre-existing) |
 | 7 | GSC + GA4 + GBP data visible | ⚠️ Partial — GSC only |
 | 8 | Change proposals + PR | ✅ **Done this cycle**, scoped to auto-fixable rule types (see §5) — not a fully generic proposal system for every finding type |
-| 9 | Approval + merge + verification | ⚠️ Partial — approval+merge is real (Merge/Close/Delete buttons, in-platform diff viewer); **no automated post-deploy verification** that a merged fix actually resolved the finding (would need a re-crawl-and-compare job) |
+| 9 | Approval + merge + verification | ⚠️ Partial — approval+merge is real (Merge/Close/Delete, in-platform diff viewer), **and merges are now deploy-checked with one-click revert on failure** (see §9); still **no automated re-crawl to confirm a *successful* merge actually resolved the finding** |
 | 10 | Monitoring | ⚠️ Partial — only GSC sitemap-issue diffing (hourly cron, email on change). No crawl-based regression detection, no Lighthouse-score history, no "deployment → SEO incident" correlation |
 | 11 | Reports | ❌ Not built — no exportable technical-SEO reports (the old mock `/activity`, `/opportunities` etc. screens are unrelated fake data, not reports of real findings) |
 | 12 | AI layer | ❌ Not built — zero LLM integration anywhere. All generated text (titles/descriptions) is template-based, not AI-generated, by design (see §5) |
@@ -131,10 +131,44 @@ session-gating convention as `/search-console`, `/lighthouse`, and `/github/*`.
   load, Lighthouse run) now shows a spinner + live elapsed-seconds counter, plus a "Re-run" button
   on both `/technical-seo` and `/lighthouse`.
 
-## 9. Recommended next priority
+## 9. Quality gate + deployment safety net (added after a real production incident)
+
+The first real auto-fix PR merged against a live repo (`vigel.vercel.app`) **broke that repo's
+Vercel deployment** — a genuine incident, not a hypothetical. Root cause: removing both dead-link
+entries from a 2-item nav-data array (`legal: [{href:"/privacy",...}, {href:"/terms",...}]`) left
+`legal: []`, which TypeScript infers as `never[]`, breaking `.map((item) => item.label)` at the
+call site. The bug was in `deadLinkFix.ts`'s own transformation logic, not anything the user did.
+Two things came out of this:
+
+1. **Prevented at the source**: `deadLinkFix.ts` now refuses to remove an array entry if doing so
+   would leave the enclosing array with zero remaining object entries — it leaves the dead link in
+   place (reported as skipped) rather than risk emptying the array again.
+2. **A general two-layer safety net was added**, since the source-level fix only covers this one
+   specific pattern:
+   - **Pre-commit syntax validation** (`codeValidation.ts`, `ts.transpileModule`): every generated
+     file is parsed before it's ever committed; anything that fails is dropped from the PR and
+     reported as skipped. Deliberately syntax-only — actually running the connected repo's own
+     `npm install`/build on our server would mean executing arbitrary third-party code (a malicious
+     `postinstall` script would run with our server's access), which the master doc's own security
+     section explicitly rules out. This step could **not** have caught the incident above (it's a
+     cross-file type error, not a syntax error) — it's a backstop for a different failure mode
+     (a string-splicing edit producing outright malformed JS/TS).
+   - **Post-merge deployment monitoring** (`GET fix/deploy-status`, polls GitHub's commit-status
+     API — what Vercel's GitHub integration posts to a commit): after clicking Merge, the UI polls
+     for up to 2 minutes and shows the real deploy outcome. On failure, a one-click **Revert**
+     (`POST fix/revert`) creates a forward `git revert`-equivalent commit (new commit, old tree,
+     no force-push/history rewrite) — deliberately not automatic/silent, since every other action
+     in this pipeline already requires an explicit click, and auto-reverting someone's real repo
+     without asking would be a bigger unilateral action than anything else built here.
+
+This was validated for real: the actual incident above was fixed via this exact revert mechanism
+against the live `Vigel` repo (verified the resulting commit redeployed successfully on Vercel and
+the live site was restored), not just tested in the abstract.
+
+## 10. Recommended next priority
 
 Per the master doc's own guidance ("finish the loop before adding modules") and what's now the
 biggest real gap: **Phase 9's missing half — automated verification**. The loop currently is
-Crawl → Findings → PR → Merge, but nothing re-crawls after a merge to confirm the finding actually
-resolved and close it out. That's the natural next increment before touching monitoring, reporting,
-GA4/GBP data, or anything AI-related.
+Crawl → Findings → PR → Merge → Deploy-check/Revert-if-failed, but nothing re-crawls after a
+*successful* merge to confirm the finding actually resolved and close it out. That's the natural
+next increment before touching monitoring, reporting, GA4/GBP data, or anything AI-related.

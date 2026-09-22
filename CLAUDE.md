@@ -102,6 +102,19 @@ if much time has passed since its snapshot date.
   needing genuinely new content (broken-link targets that would require a real replacement page,
   duplicate content needing real distinct copy) stays a human-only recommendation, listed in the PR
   body. See `current_status.md` for how this maps onto the full product roadmap.
+- **Auto-fix has a two-layer safety net**, added after a real incident where a merged fix broke a
+  connected repo's Vercel build (`deadLinkFix.ts` had emptied a 2-item nav array down to `[]`,
+  which TypeScript infers as `never[]`, breaking a `.map()` call — fixed at the source, see that
+  file's `findEnclosingObjectEntry`). Before every commit, `lib/integrations/codeValidation.ts`
+  parses each generated file (`ts.transpileModule`, syntax-only) and drops anything that fails
+  from the PR — deliberately **not** a real build/typecheck, since actually running the connected
+  repo's own `npm install`/build on our server would mean executing arbitrary third-party code,
+  which the security posture this product commits to explicitly rules out. That still can't catch
+  a cross-file type error like the one above, so after merging, `GET fix/deploy-status` polls
+  GitHub's commit-status API (what Vercel's integration posts) for up to 2 minutes and the UI shows
+  the real outcome; on failure, `POST fix/revert` creates a one-click, explicit (never automatic)
+  forward revert commit — same approach as `git revert`, no force-push/history rewrite. Both new
+  Prisma fields (`fixMergeCommitSha`/`fixRevertCommitSha`) live on `TechnicalSeoScan`.
 - **GitHub disconnect revokes the OAuth grant**, not just the local `Integration` row
   (`POST /api/integrations/[provider]/disconnect` → `DELETE /applications/{client_id}/grant`) —
   without this, reconnecting silently re-authorized the same account with no consent screen, since

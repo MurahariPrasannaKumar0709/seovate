@@ -21,8 +21,12 @@ export async function POST(req: NextRequest) {
   if (!token) return NextResponse.json({ error: "github_not_connected" }, { status: 200 });
 
   try {
-    await mergePullRequest(token, scan.fixPrRepoFullName, scan.fixPrNumber);
-    return NextResponse.json({ merged: true });
+    const mergeCommitSha = await mergePullRequest(token, scan.fixPrRepoFullName, scan.fixPrNumber);
+    await prisma.technicalSeoScan.update({
+      where: { id: scan.id },
+      data: { fixMergeCommitSha: mergeCommitSha, fixRevertCommitSha: null },
+    });
+    return NextResponse.json({ merged: true, mergeCommitSha });
   } catch (err) {
     const status = err instanceof GitHubApiError ? err.status : 500;
     return NextResponse.json({ error: "merge_failed", status }, { status: 200 });

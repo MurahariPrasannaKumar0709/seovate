@@ -176,6 +176,40 @@ export async function getCommitTreeSha(token: string, repoFullName: string, comm
   return data.tree.sha;
 }
 
+export async function getCommitDetails(
+  token: string,
+  repoFullName: string,
+  commitSha: string
+): Promise<{ treeSha: string; parentShas: string[] }> {
+  const data = await githubFetch<{ tree: { sha: string }; parents: { sha: string }[] }>(
+    token,
+    `/repos/${repoFullName}/git/commits/${commitSha}`
+  );
+  return { treeSha: data.tree.sha, parentShas: data.parents.map((p) => p.sha) };
+}
+
+export type CommitStatus = { state: "pending" | "success" | "failure" | "error"; description: string | null; targetUrl: string | null };
+
+/** The GitHub Commit Status API — what Vercel's (and any CI's) GitHub integration posts to a
+ *  commit. Used to know whether a merge actually deployed, since GitHub's own "merged" flag says
+ *  nothing about what happened after — a build can fail after a clean merge (this is exactly what
+ *  happened once already: a merge that type-checked fine locally still failed Vercel's build). */
+export async function getCommitStatus(token: string, repoFullName: string, sha: string): Promise<CommitStatus | null> {
+  const data = await githubFetch<{ state: string; statuses: { state: string; description: string | null; target_url: string | null; context: string }[] }>(
+    token,
+    `/repos/${repoFullName}/commits/${sha}/status`
+  );
+  if (data.statuses.length === 0) return null;
+  // Prefer a deployment-looking status (Vercel, Netlify, etc.) over a generic CI check if both
+  // exist; otherwise the aggregate state GitHub itself computed is a reasonable fallback.
+  const deployStatus = data.statuses.find((s) => /vercel|netlify|deploy/i.test(s.context)) ?? data.statuses[0];
+  return {
+    state: deployStatus.state as CommitStatus["state"],
+    description: deployStatus.description,
+    targetUrl: deployStatus.target_url,
+  };
+}
+
 export async function createGitCommit(
   token: string,
   repoFullName: string,
@@ -278,8 +312,13 @@ export async function listPullRequestFiles(
   return githubFetch<GitHubPullRequestFile[]>(token, `/repos/${repoFullName}/pulls/${number}/files`);
 }
 
-export async function mergePullRequest(token: string, repoFullName: string, number: number): Promise<void> {
-  await githubFetch(token, `/repos/${repoFullName}/pulls/${number}/merge`, { method: "PUT", body: "{}" });
+/** Returns the merge commit's SHA — needed to later check deployment status or revert. */
+export async function mergePullRequest(token: string, repoFullName: string, number: number): Promise<string> {
+  const data = await githubFetch<{ sha: string }>(token, `/repos/${repoFullName}/pulls/${number}/merge`, {
+    method: "PUT",
+    body: "{}",
+  });
+  return data.sha;
 }
 
 export async function closePullRequest(token: string, repoFullName: string, number: number): Promise<void> {

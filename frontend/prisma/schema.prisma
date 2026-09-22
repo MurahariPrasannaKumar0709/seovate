@@ -84,6 +84,11 @@ model TechnicalSeoScan {
   // repo could change between the scan and any later merge/close action on this PR.
   fixPrNumber       Int?
   fixPrRepoFullName String?
+  // Set once that PR has been merged, so a deployment (Vercel via GitHub's commit-status API) can
+  // be tracked and, if it fails, reverted with one click without needing the original PR's branch
+  // (which is deleted on merge).
+  fixMergeCommitSha String?
+  fixRevertCommitSha String?
   findings     TechnicalSeoFinding[]
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
