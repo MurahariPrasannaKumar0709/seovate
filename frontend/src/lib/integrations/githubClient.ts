@@ -119,6 +119,103 @@ export async function createBranch(
   });
 }
 
+/** Repo-wide literal-text search (GitHub's code search API) — used to locate which file(s)
+ *  reference a dead link (e.g. a shared Footer/Nav component), since a finding only tells us
+ *  which *page* contains the link, not which *file* actually renders that shared component. */
+export async function searchCode(token: string, repoFullName: string, literal: string): Promise<{ path: string }[]> {
+  const query = `${JSON.stringify(literal)} repo:${repoFullName}`;
+  const data = await githubFetch<{ items: { path: string }[] }>(token, `/search/code?q=${encodeURIComponent(query)}`);
+  return data.items.map((i) => ({ path: i.path }));
+}
+
+export type GitHubCompareFile = { filename: string; status: string; additions: number; deletions: number; patch?: string };
+
+/** Unified diffs for every file between two refs — richer than `listPullRequestFiles` (which only
+ *  gives filenames + line counts), used to render an in-platform review view of a PR's changes. */
+export async function compareCommits(
+  token: string,
+  repoFullName: string,
+  base: string,
+  head: string
+): Promise<{ files: GitHubCompareFile[] }> {
+  const data = await githubFetch<{ files: GitHubCompareFile[] }>(token, `/repos/${repoFullName}/compare/${base}...${head}`);
+  return { files: data.files ?? [] };
+}
+
+// --- Git Data API: building one commit out of several file changes at once (the Contents API's
+// createOrUpdateFile always makes its own commit per call, which is fine for a single file but
+// produces a noisy multi-commit PR — and each intermediate commit's preview deployment gets
+// cancelled by Vercel — when fixing several files together). ---
+
+export async function createBlob(token: string, repoFullName: string, content: string): Promise<string> {
+  const data = await githubFetch<{ sha: string }>(token, `/repos/${repoFullName}/git/blobs`, {
+    method: "POST",
+    body: JSON.stringify({ content: Buffer.from(content, "utf-8").toString("base64"), encoding: "base64" }),
+  });
+  return data.sha;
+}
+
+export async function createTree(
+  token: string,
+  repoFullName: string,
+  baseTreeSha: string,
+  files: { path: string; blobSha: string }[]
+): Promise<string> {
+  const data = await githubFetch<{ sha: string }>(token, `/repos/${repoFullName}/git/trees`, {
+    method: "POST",
+    body: JSON.stringify({
+      base_tree: baseTreeSha,
+      tree: files.map((f) => ({ path: f.path, mode: "100644", type: "blob", sha: f.blobSha })),
+    }),
+  });
+  return data.sha;
+}
+
+export async function getCommitTreeSha(token: string, repoFullName: string, commitSha: string): Promise<string> {
+  const data = await githubFetch<{ tree: { sha: string } }>(token, `/repos/${repoFullName}/git/commits/${commitSha}`);
+  return data.tree.sha;
+}
+
+export async function createGitCommit(
+  token: string,
+  repoFullName: string,
+  message: string,
+  treeSha: string,
+  parentSha: string
+): Promise<string> {
+  const data = await githubFetch<{ sha: string }>(token, `/repos/${repoFullName}/git/commits`, {
+    method: "POST",
+    body: JSON.stringify({ message, tree: treeSha, parents: [parentSha] }),
+  });
+  return data.sha;
+}
+
+export async function updateRef(token: string, repoFullName: string, branch: string, sha: string): Promise<void> {
+  await githubFetch(token, `/repos/${repoFullName}/git/refs/heads/${branch}`, {
+    method: "PATCH",
+    body: JSON.stringify({ sha, force: false }),
+  });
+}
+
+/** Commits several file changes to `branch` as a single commit (instead of one Contents-API call
+ *  per file). `files` must be a non-empty array of {path, content}. */
+export async function commitFiles(
+  token: string,
+  repoFullName: string,
+  branch: string,
+  message: string,
+  files: { path: string; content: string }[]
+): Promise<void> {
+  const parentSha = await getRef(token, repoFullName, branch);
+  const baseTreeSha = await getCommitTreeSha(token, repoFullName, parentSha);
+  const blobs = await Promise.all(
+    files.map(async (f) => ({ path: f.path, blobSha: await createBlob(token, repoFullName, f.content) }))
+  );
+  const treeSha = await createTree(token, repoFullName, baseTreeSha, blobs);
+  const commitSha = await createGitCommit(token, repoFullName, message, treeSha, parentSha);
+  await updateRef(token, repoFullName, branch, commitSha);
+}
+
 export async function createOrUpdateFile(
   token: string,
   repoFullName: string,
@@ -190,4 +287,15 @@ export async function closePullRequest(token: string, repoFullName: string, numb
     method: "PATCH",
     body: JSON.stringify({ state: "closed" }),
   });
+}
+
+/** Deletes a branch ref. Treats "already gone" (404) as success — deleting a branch a merge or
+ *  an earlier retry already removed shouldn't surface as a failure to the caller. */
+export async function deleteBranch(token: string, repoFullName: string, branch: string): Promise<void> {
+  try {
+    await githubFetch(token, `/repos/${repoFullName}/git/refs/heads/${branch}`, { method: "DELETE" });
+  } catch (err) {
+    if (err instanceof GitHubApiError && err.status === 404) return;
+    throw err;
+  }
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Tag from "@/components/ui/Tag";
 import { Button } from "@/components/ui/Button";
 import { SketchBox, InfoCallout } from "@/components/ui/SketchBox";
+import { LoadingTimer, useLoadingTimer } from "@/components/ui/LoadingTimer";
 
 type CategoryKey = "performance" | "accessibility" | "best-practices" | "seo";
 const CATEGORY_LABELS: Record<CategoryKey, string> = {
@@ -63,6 +64,7 @@ export default function LighthousePage() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<AuditResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const timer = useLoadingTimer();
 
   useEffect(() => {
     fetch("/api/lighthouse/audit")
@@ -79,15 +81,25 @@ export default function LighthousePage() {
 
   async function runAudit(e: React.FormEvent) {
     e.preventDefault();
-    if (!url || categories.length === 0) return;
+    await runAuditFor(url, device, categories);
+  }
+
+  async function rerunAudit() {
+    if (!report) return;
+    await runAuditFor(report.url, report.device, categories.length > 0 ? categories : ALL_CATEGORIES);
+  }
+
+  async function runAuditFor(targetUrl: string, targetDevice: "mobile" | "desktop", targetCategories: CategoryKey[]) {
+    if (!targetUrl || targetCategories.length === 0) return;
     setRunning(true);
+    timer.start();
     setError(null);
     setResult(null);
     try {
       const res = await fetch("/api/lighthouse/audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, device, categories }),
+        body: JSON.stringify({ url: targetUrl, device: targetDevice, categories: targetCategories }),
       });
       const data: AuditResult = await res.json();
       if ("error" in data) {
@@ -103,6 +115,7 @@ export default function LighthousePage() {
       setError("Couldn't reach the server. Please try again.");
     } finally {
       setRunning(false);
+      timer.stop();
     }
   }
 
@@ -177,19 +190,30 @@ export default function LighthousePage() {
               <p className="rounded border-2 border-warn bg-warn-soft px-3 py-2 text-sm text-warn">{error}</p>
             )}
 
-            <Button type="submit" disabled={running || categories.length === 0} className="mt-2 w-full justify-center sm:w-auto">
-              {running ? "Running audit… (15-30s)" : "Run Lighthouse audit →"}
-            </Button>
+            <div className="mt-2 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+              <Button type="submit" disabled={running || categories.length === 0} className="w-full justify-center sm:w-auto">
+                {running ? "Running audit…" : "Run Lighthouse audit →"}
+              </Button>
+              <LoadingTimer active={running} seconds={timer.seconds} label="Running audit (15-30s typical)" />
+            </div>
           </form>
         </SketchBox>
 
         {report && (
           <>
-            <p className="mt-8 text-sm text-muted">
-              Audited <span className="font-mono text-ink">{report.url}</span> ·{" "}
-              {report.device === "mobile" ? "Mobile" : "Desktop"} ·{" "}
-              {new Date(report.fetchedAt).toLocaleString()}
-            </p>
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-muted">
+                Audited <span className="font-mono text-ink">{report.url}</span> ·{" "}
+                {report.device === "mobile" ? "Mobile" : "Desktop"} ·{" "}
+                {new Date(report.fetchedAt).toLocaleString()}
+              </p>
+              <div className="flex items-center gap-3">
+                <Button type="button" variant="ghost" disabled={running} onClick={rerunAudit}>
+                  {running ? "Running…" : "Re-run audit ↻"}
+                </Button>
+                <LoadingTimer active={running} seconds={timer.seconds} label="Running" />
+              </div>
+            </div>
 
             <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
               {ALL_CATEGORIES.filter((cat) => report.categories[cat]).map((cat) => (

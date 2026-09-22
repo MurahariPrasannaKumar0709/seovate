@@ -1,7 +1,10 @@
 # Seovate — project notes for Claude
 
 Autonomous SEO product (mock/demo backend for a single fictional customer, "Frisco Plumbing
-Co."). See `README.md` for run instructions and `docs/` for the product/strategy docs.
+Co."). See `README.md` for run instructions, `docs/` for the product/strategy docs, and
+`current_status.md` for a point-in-time audit of what's real vs. mock against the master product
+doc (`SEO_Automation_Platform_End_to_End_Product_Documentation.pdf`) — re-audit before trusting it
+if much time has passed since its snapshot date.
 
 ## Structure
 - `frontend/` — Next.js 16 (App Router, Turbopack) + TypeScript + Tailwind v4. All UI screens,
@@ -72,6 +75,37 @@ Co."). See `README.md` for run instructions and `docs/` for the product/strategy
   — both are real GitHub API calls, not simulated. The previous "Request changes" button was
   removed (no real one-call GitHub equivalent — that's a PR review, a separate, heavier API) rather
   than left as a fake local-only state.
+- **Technical SEO audit + auto-fix is real end-to-end** (`/technical-seo`, session-gated like
+  `/search-console`/`/lighthouse`/`/github/*` — not one of the public mock-fallback screens).
+  `POST /api/technical-seo/scan` runs `crawlSiteDetailed` (`lib/integrations/siteCrawler.ts` — a
+  second, separate crawler from the GitHub-scaffolding one below; same-origin, 40-page cap to fit
+  a serverless function's timeout, extracts title/meta description/H1s/canonical/JSON-LD/links per
+  page, handles `application/xhtml+xml` responses not just `text/html`) through a deterministic,
+  pure rule engine (`lib/integrations/technicalSeoRules.ts` — title/meta/canonical/H1/broken-link
+  checks), storing results as `TechnicalSeoScan` → many `TechnicalSeoFinding` rows. **Auto-fix**
+  (`POST /api/technical-seo/fix`) opens one GitHub PR, as one commit (Git Data API — blob/tree/
+  commit/ref, not one Contents-API call per file, which used to fragment into a noisy multi-commit
+  PR with cancelled Vercel previews), covering every finding it can fix without fabricating
+  content: missing/duplicate title, meta description, canonical tag, and best-effort H1 injection
+  (`lib/integrations/pageMetadataFix.ts` — merges into an existing `metadata` export via brace-
+  matched edits when safe, skips Client Components and dynamic `generateMetadata()` functions), plus
+  dead-internal-link **removal** (`lib/integrations/deadLinkFix.ts` — deliberately removes the link
+  rather than generating replacement page content, since a fabricated Privacy Policy/Terms page is
+  a real liability risk if merged; handles both plain JSX `href="..."` and nav-items data-array
+  shapes, and masks `//`/`/* */` comments before scanning so dead/commented-out code is never
+  matched). File discovery for dead links fetches the full repo tree + every code file's content
+  directly rather than GitHub's code-search API — confirmed via a real small repo that the search
+  index can simply have zero results for a string that's definitely present, with no way to force
+  reindexing. `GET fix/diff` renders the PR's unified diff inline (GitHub's compare API) so changes
+  can be reviewed without leaving Seovate; `fix/merge`, `fix/close`, `fix/delete` (closes + deletes
+  the branch, since GitHub has no real "delete a PR" API) round out the approval gate. Everything
+  needing genuinely new content (broken-link targets that would require a real replacement page,
+  duplicate content needing real distinct copy) stays a human-only recommendation, listed in the PR
+  body. See `current_status.md` for how this maps onto the full product roadmap.
+- **GitHub disconnect revokes the OAuth grant**, not just the local `Integration` row
+  (`POST /api/integrations/[provider]/disconnect` → `DELETE /applications/{client_id}/grant`) —
+  without this, reconnecting silently re-authorized the same account with no consent screen, since
+  the grant was still live on GitHub's side even after "disconnecting" in Seovate.
 - **Google OAuth Cloud Console setup** (needed once per Google Cloud project, not code): both
   `GOOGLE_LOGIN_REDIRECT_URI` and `GOOGLE_INTEGRATIONS_REDIRECT_URI` must be added under
   "Authorized redirect URIs" on the OAuth client matching `GOOGLE_CLIENT_ID` — `redirect_uri_mismatch`
@@ -102,6 +136,12 @@ Co."). See `README.md` for run instructions and `docs/` for the product/strategy
   data this app doesn't collect anywhere yet.
 - The site crawler (`lib/integrations/siteCrawler.ts`) is same-origin, one level deep, no JS
   rendering, capped at 50 pages — fine for a small marketing site, not a real full-site audit tool.
+- Two independent crawlers exist in `siteCrawler.ts` (`crawlSite`/`verifyUrlsLive` for the GitHub
+  scaffolding flow, `crawlSiteDetailed` for the technical-SEO audit) — built for different features
+  at different times, neither shares a page-inventory table with the other. Not unified.
+- No automated post-merge verification for technical-SEO auto-fix PRs — merging a fix doesn't
+  trigger a re-crawl to confirm the finding actually resolved and close it out. The loop stops at
+  "merged," not "verified."
 
 ## Running locally
 ```

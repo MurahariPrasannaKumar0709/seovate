@@ -13,6 +13,7 @@ model User {
   lastLoginAt  DateTime?
   googleSub    String?
   integrations Integration[]
+  technicalSeoScans TechnicalSeoScan[]
 
   @@map("users")
 }
@@ -63,4 +64,44 @@ model Integration {
 
   @@unique([userId, provider])
   @@map("integrations")
+}
+
+// A single run of the technical-SEO crawler + rule engine (docs/13-seo-automation-plan.md's V1
+// rule list) against one site. `pagesScanned`/`truncated` record the crawl's actual reach so the
+// UI can say "audited 40 of ~120 pages" instead of implying full-site coverage.
+model TechnicalSeoScan {
+  id           String    @id @default(cuid())
+  userId       String
+  siteUrl      String
+  status       String    @default("running") // running | complete | failed
+  pagesScanned Int       @default(0)
+  truncated    Boolean   @default(false)
+  errorMessage String?
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  // Set once a "fix missing canonical tags" PR has been opened for this scan (see
+  // /api/technical-seo/fix) — repo is captured alongside the PR number since the user's selected
+  // repo could change between the scan and any later merge/close action on this PR.
+  fixPrNumber       Int?
+  fixPrRepoFullName String?
+  findings     TechnicalSeoFinding[]
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
+  @@map("technical_seo_scans")
+}
+
+model TechnicalSeoFinding {
+  id        String           @id @default(cuid())
+  scanId    String
+  ruleId    String
+  category  String
+  severity  String
+  url       String
+  evidence  Json
+  createdAt DateTime         @default(now())
+  scan      TechnicalSeoScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@index([scanId])
+  @@map("technical_seo_findings")
 }
